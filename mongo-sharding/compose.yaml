@@ -3,6 +3,25 @@ version: '3'
 name: mongo-sharding
 
 services:
+  # ==========================================
+  # ВАШЕ ПРИЛОЖЕНИЕ (pymongo-api)
+  # ==========================================
+  pymongo_api:
+    build:
+      context: api_app
+      dockerfile: Dockerfile
+    container_name: pymongo_api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      MONGODB_URL: "mongodb://mongos_router:27020"
+      MONGODB_DATABASE_NAME: "somedb"
+    networks:
+      - app-network
+    depends_on:
+      - mongos_router
+
   # Сервер конфигурации
   configSrv:
     image: mongo:latest
@@ -14,12 +33,7 @@ services:
       - app-network
     volumes:
       - config-data:/data/db
-    command: [ 
-      "--configsvr", 
-      "--replSet", "config_server", 
-      "--bind_ip_all", 
-      "--port", "27017" 
-    ]
+    command: [ "--configsvr", "--replSet", "config_server", "--bind_ip_all", "--port", "27017" ]
 
   # 1-й шард
   shard1:
@@ -32,12 +46,7 @@ services:
       - app-network
     volumes:
       - shard1-data:/data/db
-    command: [ 
-      "--shardsvr", 
-      "--replSet", "shard1_set", 
-      "--bind_ip_all", 
-      "--port", "27018" 
-    ]
+    command: [ "--shardsvr", "--replSet", "shard1_set", "--bind_ip_all", "--port", "27018" ]
 
   # 2-й шард
   shard2:
@@ -50,12 +59,7 @@ services:
       - app-network
     volumes:
       - shard2-data:/data/db
-    command: [ 
-      "--shardsvr", 
-      "--replSet", "shard2_set", 
-      "--bind_ip_all", 
-      "--port", "27019" 
-    ]
+    command: [ "--shardsvr", "--replSet", "shard2_set", "--bind_ip_all", "--port", "27019" ]
 
   # Роутер (mongos)
   mongos_router:
@@ -66,12 +70,7 @@ services:
       - "27020:27020"
     networks:
       - app-network
-    command: [ 
-      "mongos", 
-      "--configdb", "config_server/configSrv:27017", 
-      "--bind_ip_all", 
-      "--port", "27020" 
-    ]
+    command: [ "mongos", "--configdb", "config_server/configSrv:27017", "--bind_ip_all", "--port", "27020" ]
     depends_on:
       - configSrv
 
