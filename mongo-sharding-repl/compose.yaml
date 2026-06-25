@@ -1,0 +1,170 @@
+version: '3'
+
+name: mongo-sharding-repl
+
+services:
+  pymongo_api:
+    build:
+      context: api_app
+      dockerfile: Dockerfile
+    container_name: pymongo_api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      MONGODB_URL: "mongodb://mongos_router:27020"
+      MONGODB_DATABASE_NAME: "somedb"
+      # REDIS_URL убран, приложение автоматически отключит кэширование
+    networks:
+      - app-network
+    depends_on:
+      - mongos_router
+
+  # ==========================================
+  # РЕПЛИКА-СЕТ КОНФИГУРАЦИОННЫХ СЕРВЕРОВ (3 шт)
+  # ==========================================
+  configSrv1:
+    image: mongo:latest
+    container_name: configSrv1
+    restart: always
+    ports:
+      - "27011:27017"
+    networks:
+      - app-network
+    volumes:
+      - config-data1:/data/db
+    command: [ "--configsvr", "--replSet", "config_server", "--bind_ip_all", "--port", "27017" ]
+
+  configSrv2:
+    image: mongo:latest
+    container_name: configSrv2
+    restart: always
+    ports:
+      - "27012:27017"
+    networks:
+      - app-network
+    volumes:
+      - config-data2:/data/db
+    command: [ "--configsvr", "--replSet", "config_server", "--bind_ip_all", "--port", "27017" ]
+
+  configSrv3:
+    image: mongo:latest
+    container_name: configSrv3
+    restart: always
+    ports:
+      - "27013:27017"
+    networks:
+      - app-network
+    volumes:
+      - config-data3:/data/db
+    command: [ "--configsvr", "--replSet", "config_server", "--bind_ip_all", "--port", "27017" ]
+
+  # ==========================================
+  # РЕПЛИКА-СЕТ ШАРДА 1 (3 шт)
+  # ==========================================
+  shard1-1:
+    image: mongo:latest
+    container_name: shard1-1
+    restart: always
+    ports:
+      - "27018:27018"
+    networks:
+      - app-network
+    volumes:
+      - shard1-data1:/data/db
+    command: [ "--shardsvr", "--replSet", "shard1_set", "--bind_ip_all", "--port", "27018" ]
+
+  shard1-2:
+    image: mongo:latest
+    container_name: shard1-2
+    restart: always
+    ports:
+      - "27028:27018"
+    networks:
+      - app-network
+    volumes:
+      - shard1-data2:/data/db
+    command: [ "--shardsvr", "--replSet", "shard1_set", "--bind_ip_all", "--port", "27018" ]
+
+  shard1-3:
+    image: mongo:latest
+    container_name: shard1-3
+    restart: always
+    ports:
+      - "27038:27018"
+    networks:
+      - app-network
+    volumes:
+      - shard1-data3:/data/db
+    command: [ "--shardsvr", "--replSet", "shard1_set", "--bind_ip_all", "--port", "27018" ]
+
+  # ==========================================
+  # РЕПЛИКА-СЕТ ШАРДА 2 (3 шт)
+  # ==========================================
+  shard2-1:
+    image: mongo:latest
+    container_name: shard2-1
+    restart: always
+    ports:
+      - "27019:27019"
+    networks:
+      - app-network
+    volumes:
+      - shard2-data1:/data/db
+    command: [ "--shardsvr", "--replSet", "shard2_set", "--bind_ip_all", "--port", "27019" ]
+
+  shard2-2:
+    image: mongo:latest
+    container_name: shard2-2
+    restart: always
+    ports:
+      - "27029:27019"
+    networks:
+      - app-network
+    volumes:
+      - shard2-data2:/data/db
+    command: [ "--shardsvr", "--replSet", "shard2_set", "--bind_ip_all", "--port", "27019" ]
+
+  shard2-3:
+    image: mongo:latest
+    container_name: shard2-3
+    restart: always
+    ports:
+      - "27039:27019"
+    networks:
+      - app-network
+    volumes:
+      - shard2-data3:/data/db
+    command: [ "--shardsvr", "--replSet", "shard2_set", "--bind_ip_all", "--port", "27019" ]
+
+  # ==========================================
+  # РОУТЕР MONGOS
+  # ==========================================
+  mongos_router:
+    image: mongo:latest
+    container_name: mongos_router
+    restart: always
+    ports:
+      - "27020:27020"
+    networks:
+      - app-network
+    command: [ "mongos", "--configdb", "config_server/configSrv1:27017,configSrv2:27017,configSrv3:27017", "--bind_ip_all", "--port", "27020" ]
+    depends_on:
+      - configSrv1
+      - configSrv2
+      - configSrv3
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  config-data1:
+  config-data2:
+  config-data3:
+  shard1-data1:
+  shard1-data2:
+  shard1-data3:
+  shard2-data1:
+  shard2-data2:
+  shard2-data3:
